@@ -3,20 +3,13 @@ import fs from 'node:fs';
 import type { CountyConnector, FetchOptions } from '../types';
 import type { RawParcel } from '../../lib/types';
 import { SNOHOMISH, parcelLookupUrl } from './endpoints';
+import { fetchParcels, fetchAssessorByApns } from './layers';
+import { buildRawParcel, makeFailureCounters } from './merge';
 
 // Snohomish County connector.
-//
-// Phase 1 strategy:
-//   - For live ingestion, hit the ArcGIS REST endpoints in ./endpoints.ts,
-//     page through results, and join wetland/sewer/road features by APN or
-//     spatial overlay. Stubs for that wire format live in `fetchLive` below.
-//   - For local development and the acceptance flow, the connector reads a
-//     normalized sample fixture so the app is runnable end-to-end without
-//     network access. Replace `useSampleData()` with `fetchLive()` once an
-//     API key / proxy is in place.
-//
-// All RawParcel fields can be null; derived fields (usable_acres,
-// improvement_ratio, wetland_percent, score) are computed downstream.
+// Default path reads a bundled sample fixture so the app is runnable end-to-end
+// without network access. Setting LANDFINDER_LIVE=1 switches to fetchLive which
+// hits the public ArcGIS REST endpoints documented in ./endpoints.ts.
 
 const SAMPLE_PATH = path.join(process.cwd(), 'src', 'data', 'snohomish-sample.json');
 
@@ -35,19 +28,39 @@ function loadSample(): RawParcel[] {
   }));
 }
 
-// Live ingest stub. Wire each layer query here, then merge on APN.
-// Left intentionally lightweight in Phase 1 — sample data drives the UI.
-async function fetchLive(_options: FetchOptions): Promise<RawParcel[]> {
-  // 1) Query SNOHOMISH.parcels for features where CALCACRES >= min, paged 1000 at a time.
-  // 2) Join SNOHOMISH.assessor by PARCELID to pull owner_name / mailing_address /
-  //    site_address / land_value / improvement_value / last_sale_date.
-  // 3) For each parcel polygon, intersect SNOHOMISH.wetlands to compute wetland_acres.
-  // 4) Test polygon against SNOHOMISH.sewerServiceArea for inside flag, then run a
-  //    nearest-feature query against SNOHOMISH.sewerMains for distance_to_sewer.
-  // 5) Test polygon edge against SNOHOMISH.roadCenterlines (buffered by ROW width)
-  //    for touches_public_road and estimated_road_frontage.
-  // 6) Return RawParcel[] — derived fields and score are computed by normalizeParcel().
-  throw new Error('Live Snohomish ingest not enabled in Phase 1. Run `npm run seed`.');
+async function fetchLive(options: FetchOptions): Promise<RawParcel[]> {
+  const minGrossAcres = options.minGrossAcres ?? 3;
+  console.log(`[snohomish] live ingest: min ${minGrossAcres} acres, max ${options.maxRecords ?? '∞'} parcels`);
+
+  const parcelFeatures = await fetchParcels({
+    minGrossAcres,
+    maxRecords: options.maxRecords
+  });
+  console.log(`[snohomish]   fetched ${parcelFeatures.length} parcel features`);
+
+  const apns: string[] = [];
+  for (const p of parcelFeatures) {
+    const apn = p.properties.PARCELID ?? p.properties.PIN ?? p.properties.APN;
+    if (apn) apns.push(apn);
+  }
+  const assessorByApn = await fetchAssessorByApns(apns);
+  console.log(`[snohomish]   joined ${assessorByApn.size}/${apns.length} assessor records`);
+
+  const counters = makeFailureCounters();
+  const out: RawParcel[] = [];
+  // Sequential spatial layer fetches per parcel to be polite to county GIS.
+  // Cache makes re-runs fast; a single fresh ingest is acceptably slow.
+  for (const feat of parcelFeatures) {
+    const parcel = await buildRawParcel(feat, assessorByApn, counters);
+    if (parcel) out.push(parcel);
+  }
+
+  console.log(
+    `[snohomish]   built ${out.length} parcels; layer failures: ` +
+    `wetlands=${counters.wetlands} ssa=${counters.sewer_ssa} ` +
+    `mains=${counters.sewer_mains} road=${counters.road}`
+  );
+  return out;
 }
 
 export const snohomishConnector: CountyConnector = {

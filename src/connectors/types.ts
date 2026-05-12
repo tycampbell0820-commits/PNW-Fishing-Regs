@@ -13,5 +13,8 @@ export interface CountyConnector {
 
 export interface FetchOptions {
   minGrossAcres?: number;
-  // Bounded extent or specific APNs can be added later; out of scope for Phase 1.
+  // Cap the number of parcels returned. Useful for partial ingests during
+  // development. Connectors may interpret this as a per-source paging limit.
+  maxRecords?: number;
+  // Bounded extent or specific APNs can be added later.
 }
