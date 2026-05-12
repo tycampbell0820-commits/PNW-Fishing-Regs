@@ -40,6 +40,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1001 node-app
 
+# Full node_modules from the build stage. The standalone bundle below
+# overwrites overlapping files, so Next's runtime tweaks still win — and
+# the seed/ingest scripts (run via tsx at startup) get the full dep graph
+# (@turf/*, esbuild, etc.) that the standalone trimmer would otherwise drop.
+COPY --from=build --chown=node-app:node-app /app/node_modules ./node_modules
+
 # Standalone bundle: server.js + the minimal node_modules Next packed in.
 COPY --from=build --chown=node-app:node-app /app/.next/standalone ./
 COPY --from=build --chown=node-app:node-app /app/.next/static ./.next/static
@@ -48,16 +54,6 @@ COPY --from=build --chown=node-app:node-app /app/.next/static ./.next/static
 # to seed the DB on first boot.
 COPY --from=build --chown=node-app:node-app /app/src ./src
 COPY --from=build --chown=node-app:node-app /app/tsconfig.json ./tsconfig.json
-COPY --from=build --chown=node-app:node-app /app/node_modules/tsx ./node_modules/tsx
-# tsx's runtime deps (esbuild + native binary, get-tsconfig + resolve-pkg-maps).
-COPY --from=build --chown=node-app:node-app /app/node_modules/esbuild ./node_modules/esbuild
-COPY --from=build --chown=node-app:node-app /app/node_modules/@esbuild ./node_modules/@esbuild
-COPY --from=build --chown=node-app:node-app /app/node_modules/get-tsconfig ./node_modules/get-tsconfig
-COPY --from=build --chown=node-app:node-app /app/node_modules/resolve-pkg-maps ./node_modules/resolve-pkg-maps
-# Native module needed at runtime by the ingest scripts.
-COPY --from=build --chown=node-app:node-app /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
-COPY --from=build --chown=node-app:node-app /app/node_modules/bindings ./node_modules/bindings
-COPY --from=build --chown=node-app:node-app /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
 
 COPY --chown=node-app:node-app scripts/start.sh /app/start.sh
 RUN chmod +x /app/start.sh && mkdir -p /app/data && chown node-app:node-app /app/data
