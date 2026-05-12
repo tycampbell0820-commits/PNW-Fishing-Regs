@@ -10,7 +10,7 @@
 #
 # The 1 GB volume is plenty for tens of thousands of parcels plus cache.
 
-app = "land-finder"
+app = "offmarketsource"
 primary_region = "sea"
 
 [build]
