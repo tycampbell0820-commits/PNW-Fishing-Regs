@@ -1,0 +1,28 @@
+{
+  "name": "land-finder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Off-Market Finished Lot Land Finder - acquisition screening platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/scripts/seed.ts",
+    "ingest": "tsx src/scripts/ingest.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "next": "15.5.18",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}
