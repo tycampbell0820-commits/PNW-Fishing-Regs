@@ -177,6 +177,14 @@ export function getParcel(county: string, apn: string): Parcel | null {
   return row ? fromDbRow(row) : null;
 }
 
+export function listCounties(): string[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT DISTINCT county FROM parcels WHERE county IS NOT NULL AND TRIM(county) <> '' ORDER BY county")
+    .all() as { county: string }[];
+  return rows.map(r => r.county);
+}
+
 export function countParcels(county?: string): number {
   const db = getDb();
   const sql = county

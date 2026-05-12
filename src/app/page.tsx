@@ -24,12 +24,22 @@ function filtersToParams(f: ParcelFilters, sortBy: keyof Parcel, sortDir: SortDi
 export default function HomePage() {
   const [filters, setFilters] = useState<ParcelFilters>(DEFAULT_FILTERS);
   const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [counties, setCounties] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<keyof Parcel>('finished_lot_potential_score');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [active, setActive] = useState<Parcel | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/counties')
+      .then(r => r.ok ? r.json() as Promise<{ counties: string[] }> : { counties: [] })
+      .then(data => { if (!cancelled) setCounties(data.counties); })
+      .catch(() => { /* non-fatal: dropdown just stays empty */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const queryString = useMemo(
     () => filtersToParams(filters, sortBy, sortDir),
@@ -115,6 +125,7 @@ export default function HomePage() {
     <div className="app">
       <aside>
         <FilterPanel
+          counties={counties}
           filters={filters}
           onChange={setFilters}
           onReset={() => { setFilters(DEFAULT_FILTERS); setSelected(new Set()); }}

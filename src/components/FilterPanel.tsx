@@ -3,12 +3,13 @@
 import type { ParcelFilters } from '@/lib/types';
 
 interface Props {
+  counties: string[];
   filters: ParcelFilters;
   onChange: (next: ParcelFilters) => void;
   onReset: () => void;
 }
 
-export function FilterPanel({ filters, onChange, onReset }: Props) {
+export function FilterPanel({ counties, filters, onChange, onReset }: Props) {
   const set = <K extends keyof ParcelFilters>(key: K, value: ParcelFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
@@ -17,6 +18,19 @@ export function FilterPanel({ filters, onChange, onReset }: Props) {
 
   return (
     <div className="filter-panel">
+      <h2>County</h2>
+      <div className="group">
+        <select
+          value={filters.county ?? ''}
+          onChange={e => set('county', e.target.value === '' ? undefined : e.target.value)}
+        >
+          <option value="">All counties</option>
+          {counties.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
       <h2>Acreage</h2>
       <div className="group">
         <label className="field">Min gross acres</label>
