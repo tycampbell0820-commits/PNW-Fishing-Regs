@@ -11,9 +11,9 @@ DB_PATH="/app/data/parcels.db"
 if [ ! -f "$DB_PATH" ]; then
   echo "[startup] no DB at $DB_PATH — seeding…"
   if [ "${LANDFINDER_LIVE:-0}" = "1" ]; then
-    node_modules/.bin/tsx src/scripts/ingest.ts "Snohomish County, WA"
+    node node_modules/tsx/dist/cli.mjs src/scripts/ingest.ts "Snohomish County, WA"
   else
-    node_modules/.bin/tsx src/scripts/seed.ts
+    node node_modules/tsx/dist/cli.mjs src/scripts/seed.ts
   fi
 else
   echo "[startup] DB present at $DB_PATH"

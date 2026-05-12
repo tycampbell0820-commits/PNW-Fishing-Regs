@@ -49,7 +49,6 @@ COPY --from=build --chown=node-app:node-app /app/.next/static ./.next/static
 COPY --from=build --chown=node-app:node-app /app/src ./src
 COPY --from=build --chown=node-app:node-app /app/tsconfig.json ./tsconfig.json
 COPY --from=build --chown=node-app:node-app /app/node_modules/tsx ./node_modules/tsx
-COPY --from=build --chown=node-app:node-app /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
 # tsx's runtime deps (esbuild + native binary, get-tsconfig + resolve-pkg-maps).
 COPY --from=build --chown=node-app:node-app /app/node_modules/esbuild ./node_modules/esbuild
 COPY --from=build --chown=node-app:node-app /app/node_modules/@esbuild ./node_modules/@esbuild
