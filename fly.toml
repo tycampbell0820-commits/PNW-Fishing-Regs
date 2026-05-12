@@ -1,43 +1,36 @@
-# Fly.io deployment configuration.
+# fly.toml app configuration file generated for offmarketsource on 2026-05-12T21:29:47Z
 #
-# First-time setup:
-#   fly launch --no-deploy --copy-config        # creates the app
-#   fly volumes create landfinder_data --size 1 --region sea
-#   fly secrets set LANDFINDER_AUTH_PASSWORD=<long-random-string>
-#   fly secrets set LANDFINDER_LIVE=1           # only after a successful local
-#                                               #   live-ingest run
-#   fly deploy
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# The 1 GB volume is plenty for tens of thousands of parcels plus cache.
 
-app = "offmarketsource"
-primary_region = "sea"
+app = 'offmarketsource'
+primary_region = 'sjc'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "3000"
-  LANDFINDER_AUTH_USER = "team"
+  LANDFINDER_AUTH_USER = 'team'
+  PORT = '3000'
 
-[mounts]
-  source = "landfinder_data"
-  destination = "/app/data"
+[[mounts]]
+  source = 'landfinder_data'
+  destination = '/app/data'
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 1
-  processes = ["app"]
+  processes = ['app']
 
   [http_service.concurrency]
-    type = "requests"
-    soft_limit = 50
+    type = 'requests'
     hard_limit = 100
+    soft_limit = 50
 
 [[vm]]
-  cpu_kind = "shared"
+  cpu_kind = 'shared'
   cpus = 1
   memory_mb = 512
