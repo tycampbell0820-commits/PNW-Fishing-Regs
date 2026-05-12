@@ -1,0 +1,43 @@
+# Fly.io deployment configuration.
+#
+# First-time setup:
+#   fly launch --no-deploy --copy-config        # creates the app
+#   fly volumes create landfinder_data --size 1 --region sea
+#   fly secrets set LANDFINDER_AUTH_PASSWORD=<long-random-string>
+#   fly secrets set LANDFINDER_LIVE=1           # only after a successful local
+#                                               #   live-ingest run
+#   fly deploy
+#
+# The 1 GB volume is plenty for tens of thousands of parcels plus cache.
+
+app = "land-finder"
+primary_region = "sea"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  LANDFINDER_AUTH_USER = "team"
+
+[mounts]
+  source = "landfinder_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 50
+    hard_limit = 100
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

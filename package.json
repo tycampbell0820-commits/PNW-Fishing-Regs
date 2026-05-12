@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/**/*.test.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "ingest": "tsx src/scripts/ingest.ts"
+    "ingest": "tsx src/scripts/ingest.ts",
+    "probe": "tsx src/scripts/probe.ts"
   },
   "dependencies": {
     "@turf/area": "^7.3.5",

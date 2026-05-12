@@ -1,0 +1,23 @@
+# Local production-like run.
+#   1. Copy .env.example to .env and set LANDFINDER_AUTH_PASSWORD.
+#   2. docker compose up --build
+#   3. Open http://localhost:3000 (login: team / your password)
+#
+# The `landfinder-data` named volume holds the SQLite DB + ArcGIS response
+# cache. Remove it (`docker volume rm <project>_landfinder-data`) to force a
+# full re-seed on next start.
+
+services:
+  app:
+    build: .
+    image: land-finder:local
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - landfinder-data:/app/data
+
+volumes:
+  landfinder-data:
