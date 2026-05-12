@@ -62,6 +62,7 @@ export function middleware(req: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Apply to all routes except Next.js static assets and the favicon.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  // Apply to all routes except Next.js static assets, the favicon, and the
+  // unauthenticated health endpoint used by the container healthcheck.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/health).*)']
 };
