@@ -43,7 +43,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Standalone bundle: server.js + the minimal node_modules Next packed in.
 COPY --from=build --chown=node-app:node-app /app/.next/standalone ./
 COPY --from=build --chown=node-app:node-app /app/.next/static ./.next/static
-COPY --from=build --chown=node-app:node-app /app/public ./public
 
 # Ingest CLI + connectors (not part of standalone). Used by the start script
 # to seed the DB on first boot.
