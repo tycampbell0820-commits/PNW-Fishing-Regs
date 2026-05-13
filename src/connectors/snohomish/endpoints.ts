@@ -9,7 +9,7 @@ export const SNOHOMISH = {
   // ArcGIS REST MapServer / FeatureServer endpoints. The exact layer index
   // can drift between county updates — keep these centralized for maintenance.
   parcels:
-    'https://gis.snoco.org/arcgis/rest/services/MapServices/Parcels/MapServer/0/query',
+    'https://services6.arcgis.com/z6WYi9VRHfgwgtyW/arcgis/rest/services/Parcels/FeatureServer/0/query',
 
   // Assessor account/owner data. Joined to parcels via PIN/APN.
   assessor:
