@@ -40,7 +40,7 @@ async function fetchLive(options: FetchOptions): Promise<RawParcel[]> {
 
   const apns: string[] = [];
   for (const p of parcelFeatures) {
-    const apn = p.properties.PARCELID ?? p.properties.PIN ?? p.properties.APN;
+    const apn = p.properties.PARCEL_ID ?? p.properties.PARCELID ?? p.properties.PIN ?? p.properties.APN;
     if (apn) apns.push(apn);
   }
   const assessorByApn = await fetchAssessorByApns(apns);

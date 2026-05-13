@@ -6,6 +6,25 @@ import { SNOHOMISH } from './endpoints';
 import { envelopeToEsri } from './geometry';
 
 export interface ParcelFeatureProps {
+  // Snohomish FeatureServer (services6.arcgis.com) — current source of truth.
+  PARCEL_ID?: string;
+  GIS_ACRES?: number;
+  TAB_ACRES?: number;
+  OWNERNAME?: string;
+  OWNERLINE1?: string;
+  OWNERCITY?: string;
+  OWNERSTATE?: string;
+  OWNERZIP?: string;
+  TAXPRNAME?: string;
+  TAXPRLINE1?: string;
+  TAXPRCITY?: string;
+  TAXPRSTATE?: string;
+  TAXPRZIP?: string;
+  SITUSLINE1?: string;
+  MKLND?: number;
+  MKIMP?: number;
+  MKTTL?: number;
+  // Legacy / fallback names from the old gis.snoco.org MapServer schema.
   PARCELID?: string;
   PIN?: string;
   APN?: string;
@@ -36,7 +55,7 @@ const PAGE_SIZE = 1000;
 export async function fetchParcels(
   options: { minGrossAcres: number; maxRecords?: number }
 ): Promise<GeoJsonFeature<ParcelFeatureProps>[]> {
-  const where = `CALCACRES >= ${options.minGrossAcres}`;
+  const where = `GIS_ACRES >= ${options.minGrossAcres}`;
   const out: GeoJsonFeature<ParcelFeatureProps>[] = [];
   try {
     for await (const page of iteratePages(

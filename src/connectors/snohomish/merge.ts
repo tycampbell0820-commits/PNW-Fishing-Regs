@@ -46,11 +46,36 @@ function asDateString(v: unknown): string | null {
 }
 
 function apnOf(props: ParcelFeatureProps): string | null {
-  return props.PARCELID ?? props.PIN ?? props.APN ?? null;
+  return props.PARCEL_ID ?? props.PARCELID ?? props.PIN ?? props.APN ?? null;
 }
 
 function siteAddressOf(props: ParcelFeatureProps): string | null {
-  return props.SITUS ?? props.SITE_ADDR ?? props.SITUS_ADDRESS ?? null;
+  return props.SITUSLINE1 ?? props.SITUS ?? props.SITE_ADDR ?? props.SITUS_ADDRESS ?? null;
+}
+
+function formatMailingAddress(
+  line1?: string | null,
+  city?: string | null,
+  state?: string | null,
+  zip?: string | null
+): string | null {
+  const street = line1?.trim();
+  const cityState = [city?.trim(), state?.trim()].filter(Boolean).join(', ');
+  const tail = [cityState, zip?.trim()].filter(Boolean).join(' ');
+  const out = [street, tail].filter(Boolean).join(', ');
+  return out || null;
+}
+
+function ownerNameFromParcel(props: ParcelFeatureProps): string | null {
+  const name = props.OWNERNAME ?? props.TAXPRNAME;
+  return name?.trim() || null;
+}
+
+function mailingAddressFromParcel(props: ParcelFeatureProps): string | null {
+  return (
+    formatMailingAddress(props.OWNERLINE1, props.OWNERCITY, props.OWNERSTATE, props.OWNERZIP) ??
+    formatMailingAddress(props.TAXPRLINE1, props.TAXPRCITY, props.TAXPRSTATE, props.TAXPRZIP)
+  );
 }
 
 function ownerNameOf(props: AssessorFeatureProps): string | null {
@@ -79,6 +104,8 @@ export async function buildRawParcel(
   if (!apn || !parcelFeature.geometry) return null;
 
   const grossAcres =
+    asNumber(parcelFeature.properties.GIS_ACRES) ??
+    asNumber(parcelFeature.properties.TAB_ACRES) ??
     asNumber(parcelFeature.properties.CALCACRES) ??
     asNumber(parcelFeature.properties.ACRES) ??
     polygonAreaAcres(parcelFeature.geometry);
@@ -119,13 +146,17 @@ export async function buildRawParcel(
   return {
     county: SNOHOMISH.county,
     apn,
-    owner_name: assessor ? ownerNameOf(assessor) : null,
-    mailing_address: assessor ? mailingAddressOf(assessor) : null,
+    owner_name: ownerNameFromParcel(parcelFeature.properties)
+      ?? (assessor ? ownerNameOf(assessor) : null),
+    mailing_address: mailingAddressFromParcel(parcelFeature.properties)
+      ?? (assessor ? mailingAddressOf(assessor) : null),
     site_address: siteAddressOf(parcelFeature.properties),
     gross_acres: grossAcres,
-    land_value: assessor ? asNumber(assessor.LAND_VALUE) : null,
-    improvement_value: assessor ? improvementValueOf(assessor) : null,
-    total_value: null,
+    land_value: asNumber(parcelFeature.properties.MKLND)
+      ?? (assessor ? asNumber(assessor.LAND_VALUE) : null),
+    improvement_value: asNumber(parcelFeature.properties.MKIMP)
+      ?? (assessor ? improvementValueOf(assessor) : null),
+    total_value: asNumber(parcelFeature.properties.MKTTL),
     last_sale_date: assessor ? lastSaleOf(assessor) : null,
     wetland_acres: wetlandAcres,
     inside_sewer_service_area: insideSSA,
