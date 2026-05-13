@@ -66,6 +66,15 @@ async function main() {
   const n = upsertParcels(normalized);
   console.log(`  upserted ${n} parcels`);
 
+  if (n === 0) {
+    console.error(
+      'Ingest produced 0 parcels — treating as failure so the caller can ' +
+      'restore the previous DB. Check the connector output above for the ' +
+      'underlying fetch error.'
+    );
+    process.exit(2);
+  }
+
   const scores = normalized
     .map(p => p.finished_lot_potential_score ?? 0)
     .sort((a, b) => a - b);
