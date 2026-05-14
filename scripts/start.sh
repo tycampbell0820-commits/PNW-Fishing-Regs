@@ -17,7 +17,7 @@ DB_PATH="/app/data/parcels.db"
 run_seed() {
   if [ "${LANDFINDER_LIVE:-0}" = "1" ]; then
     echo "[startup] LANDFINDER_LIVE=1 — running live ArcGIS ingest…"
-    node node_modules/tsx/dist/cli.mjs src/scripts/ingest.ts "Snohomish County, WA"
+    node node_modules/tsx/dist/cli.mjs src/scripts/ingest.ts "Snohomish County, WA" --min-acres 5
   else
     echo "[startup] LANDFINDER_LIVE=0 — seeding with fixture data…"
     node node_modules/tsx/dist/cli.mjs src/scripts/seed.ts
