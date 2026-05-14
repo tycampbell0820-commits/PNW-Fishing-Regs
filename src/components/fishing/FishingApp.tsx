@@ -767,7 +767,7 @@ function MarineBottomfishCard({ area, today, expanded, onToggle }: { area: Marin
               <div className="reg-row"><span className="reg-row-label">Daily limit</span><span className="reg-row-value">{bf.lingcod.limit}</span></div>
             </>
           ) : (
-            <p className="reg-note" style={{color:'var(--fish-closed)'}}>CLOSED — {bf.lingcod.note ?? 'not open in this area'}</p>
+            <p className="reg-note" style={{color:'var(--fish-closed)'}}>CLOSED — not open in this area</p>
           )}
 
           <p className="fish-id-section-title" style={{marginTop:10}}>Cabezon</p>
@@ -783,7 +783,7 @@ function MarineBottomfishCard({ area, today, expanded, onToggle }: { area: Marin
               <div className="reg-row"><span className="reg-row-label">Daily limit</span><span className="reg-row-value">{bf.cabezon.limit}</span></div>
             </>
           ) : (
-            <p className="reg-note" style={{color:'var(--fish-closed)'}}>CLOSED — {bf.cabezon.note ?? 'not open in this area'}</p>
+            <p className="reg-note" style={{color:'var(--fish-closed)'}}>CLOSED — not open in this area</p>
           )}
 
           <p className="fish-id-section-title" style={{marginTop:10}}>Rockfish</p>
