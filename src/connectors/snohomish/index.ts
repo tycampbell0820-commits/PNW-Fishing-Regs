@@ -2,14 +2,15 @@ import path from 'node:path';
 import fs from 'node:fs';
 import type { CountyConnector, FetchOptions } from '../types';
 import type { RawParcel } from '../../lib/types';
+import type { AssessorFeatureProps } from './layers';
 import { SNOHOMISH, parcelLookupUrl } from './endpoints';
-import { fetchParcels, fetchAssessorByApns } from './layers';
+import { iterateParcelPages } from './layers';
 import { buildRawParcel, makeFailureCounters } from './merge';
 
 // Snohomish County connector.
 // Default path reads a bundled sample fixture so the app is runnable end-to-end
-// without network access. Setting LANDFINDER_LIVE=1 switches to fetchLive which
-// hits the public ArcGIS REST endpoints documented in ./endpoints.ts.
+// without network access. Setting LANDFINDER_LIVE=1 switches to the live stream
+// that hits the public ArcGIS REST endpoint defined in ./endpoints.ts.
 
 const SAMPLE_PATH = path.join(process.cwd(), 'src', 'data', 'snohomish-sample.json');
 
@@ -28,52 +29,47 @@ function loadSample(): RawParcel[] {
   }));
 }
 
-async function fetchLive(options: FetchOptions): Promise<RawParcel[]> {
+async function* fetchLiveStream(options: FetchOptions): AsyncGenerator<RawParcel[]> {
   const minGrossAcres = options.minGrossAcres ?? 3;
   console.log(`[snohomish] live ingest: min ${minGrossAcres} acres, max ${options.maxRecords ?? '∞'} parcels`);
 
-  const parcelFeatures = await fetchParcels({
-    minGrossAcres,
-    maxRecords: options.maxRecords
-  });
-  console.log(`[snohomish]   fetched ${parcelFeatures.length} parcel features`);
-
-  const apns: string[] = [];
-  for (const p of parcelFeatures) {
-    const apn = p.properties.PARCEL_ID ?? p.properties.PARCELID ?? p.properties.PIN ?? p.properties.APN;
-    if (apn) apns.push(apn);
-  }
-  const assessorByApn = await fetchAssessorByApns(apns);
-  console.log(`[snohomish]   joined ${assessorByApn.size}/${apns.length} assessor records`);
-
   const counters = makeFailureCounters();
-  const out: RawParcel[] = [];
-  // Sequential spatial layer fetches per parcel to be polite to county GIS.
-  // Cache makes re-runs fast; a single fresh ingest is acceptably slow.
-  for (const feat of parcelFeatures) {
-    const parcel = await buildRawParcel(feat, assessorByApn, counters);
-    if (parcel) out.push(parcel);
+  const emptyAssessor = new Map<string, AssessorFeatureProps>();
+  let totalFetched = 0;
+  let totalBuilt = 0;
+
+  for await (const page of iterateParcelPages({ minGrossAcres, maxRecords: options.maxRecords })) {
+    totalFetched += page.length;
+    const built: RawParcel[] = [];
+    for (const feat of page) {
+      const parcel = await buildRawParcel(feat, emptyAssessor, counters);
+      if (parcel) built.push(parcel);
+    }
+    totalBuilt += built.length;
+    console.log(`[snohomish]   page: ${page.length} features → ${built.length} parcels (running total ${totalBuilt})`);
+    if (built.length > 0) yield built;
   }
 
   console.log(
-    `[snohomish]   built ${out.length} parcels; layer failures: ` +
+    `[snohomish]   done. ${totalBuilt} parcels built from ${totalFetched} features; layer failures: ` +
     `wetlands=${counters.wetlands} ssa=${counters.sewer_ssa} ` +
     `mains=${counters.sewer_mains} road=${counters.road}`
   );
-  return out;
+}
+
+async function* fetchSampleStream(options: FetchOptions): AsyncGenerator<RawParcel[]> {
+  const records = loadSample();
+  const min = options.minGrossAcres;
+  const filtered = min == null ? records : records.filter(r => (r.gross_acres ?? 0) >= min);
+  if (filtered.length > 0) yield filtered;
 }
 
 export const snohomishConnector: CountyConnector = {
   county: SNOHOMISH.county,
-  async fetch(options: FetchOptions = {}) {
-    if (process.env.LANDFINDER_LIVE === '1') {
-      return fetchLive(options);
-    }
-    const records = loadSample();
-    const min = options.minGrossAcres;
-    return min == null
-      ? records
-      : records.filter(r => (r.gross_acres ?? 0) >= min);
+  fetchStream(options: FetchOptions = {}) {
+    return process.env.LANDFINDER_LIVE === '1'
+      ? fetchLiveStream(options)
+      : fetchSampleStream(options);
   }
 };
 

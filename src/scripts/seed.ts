@@ -7,10 +7,12 @@ import { normalizeParcel } from '../lib/calculations';
 import { upsertParcels } from '../lib/db';
 
 async function main() {
-  const raw = await snohomishConnector.fetch();
-  const normalized = raw.map(normalizeParcel);
-  const n = upsertParcels(normalized);
-  console.log(`Seeded ${n} parcels for ${snohomishConnector.county}`);
+  let total = 0;
+  for await (const batch of snohomishConnector.fetchStream()) {
+    const normalized = batch.map(normalizeParcel);
+    total += upsertParcels(normalized);
+  }
+  console.log(`Seeded ${total} parcels for ${snohomishConnector.county}`);
 }
 
 main().catch(err => {

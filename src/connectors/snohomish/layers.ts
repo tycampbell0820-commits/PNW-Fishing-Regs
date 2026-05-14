@@ -52,26 +52,44 @@ export interface AssessorFeatureProps {
 
 const PAGE_SIZE = 1000;
 
-export async function fetchParcels(
+// Fields we actually read in merge.ts. Restricting outFields dramatically
+// reduces per-feature memory (the full schema is 50+ columns, most unused).
+const PARCEL_OUTFIELDS = [
+  'PARCEL_ID', 'GIS_ACRES', 'TAB_ACRES',
+  'OWNERNAME', 'OWNERLINE1', 'OWNERCITY', 'OWNERSTATE', 'OWNERZIP',
+  'TAXPRNAME', 'TAXPRLINE1', 'TAXPRCITY', 'TAXPRSTATE', 'TAXPRZIP',
+  'SITUSLINE1',
+  'MKLND', 'MKIMP', 'MKTTL'
+].join(',');
+
+export async function* iterateParcelPages(
   options: { minGrossAcres: number; maxRecords?: number }
-): Promise<GeoJsonFeature<ParcelFeatureProps>[]> {
+): AsyncGenerator<GeoJsonFeature<ParcelFeatureProps>[]> {
   const where = `GIS_ACRES >= ${options.minGrossAcres}`;
-  const out: GeoJsonFeature<ParcelFeatureProps>[] = [];
   try {
     for await (const page of iteratePages(
       SNOHOMISH.parcels,
-      { where, returnGeometry: true },
+      { where, returnGeometry: true, outFields: PARCEL_OUTFIELDS },
       PAGE_SIZE,
       'parcels',
       options.maxRecords
     )) {
-      out.push(...(page as GeoJsonFeature<ParcelFeatureProps>[]));
-      if (options.maxRecords != null && out.length >= options.maxRecords) {
-        return out.slice(0, options.maxRecords);
-      }
+      yield page as GeoJsonFeature<ParcelFeatureProps>[];
     }
   } catch (err) {
     console.error('[snohomish] parcels fetch failed:', (err as Error).message);
+  }
+}
+
+export async function fetchParcels(
+  options: { minGrossAcres: number; maxRecords?: number }
+): Promise<GeoJsonFeature<ParcelFeatureProps>[]> {
+  const out: GeoJsonFeature<ParcelFeatureProps>[] = [];
+  for await (const page of iterateParcelPages(options)) {
+    out.push(...page);
+    if (options.maxRecords != null && out.length >= options.maxRecords) {
+      return out.slice(0, options.maxRecords);
+    }
   }
   return out;
 }

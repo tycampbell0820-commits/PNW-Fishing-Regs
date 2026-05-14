@@ -10,7 +10,6 @@ import {
   touchesAnyLine
 } from './geometry';
 import {
-  fetchAssessorByApns,
   fetchRoadCenterlinesForParcel,
   fetchSewerMainsForParcel,
   fetchSewerSSAForParcel,
@@ -19,6 +18,12 @@ import {
   type ParcelFeatureProps
 } from './layers';
 import { SNOHOMISH, parcelLookupUrl } from './endpoints';
+
+// Spatial-layer fetches (wetlands, sewer, roads) are off by default because
+// their endpoints are stale and every call costs four retries with backoff
+// per parcel — fatal at ingest scale. Set LANDFINDER_SPATIAL_LAYERS=1 once
+// real URLs are wired in to opt back in.
+const SPATIAL_LAYERS_ENABLED = process.env.LANDFINDER_SPATIAL_LAYERS === '1';
 
 interface LayerFailureCounters {
   wetlands: number;
@@ -116,12 +121,14 @@ export async function buildRawParcel(
   const assessor = assessorByApn.get(apn) ?? null;
 
   // Spatial layer fetches. Each one is independently fault-tolerant.
-  const [wetlandFeatures, ssaFeatures, mainFeatures, roadFeatures] = await Promise.all([
-    fetchWetlandsForParcel(envelope).catch(() => { counters.wetlands++; return []; }),
-    fetchSewerSSAForParcel(envelope).catch(() => { counters.sewer_ssa++; return []; }),
-    fetchSewerMainsForParcel(envelope).catch(() => { counters.sewer_mains++; return []; }),
-    fetchRoadCenterlinesForParcel(envelope).catch(() => { counters.road++; return []; })
-  ]);
+  const [wetlandFeatures, ssaFeatures, mainFeatures, roadFeatures] = SPATIAL_LAYERS_ENABLED
+    ? await Promise.all([
+        fetchWetlandsForParcel(envelope).catch(() => { counters.wetlands++; return []; }),
+        fetchSewerSSAForParcel(envelope).catch(() => { counters.sewer_ssa++; return []; }),
+        fetchSewerMainsForParcel(envelope).catch(() => { counters.sewer_mains++; return []; }),
+        fetchRoadCenterlinesForParcel(envelope).catch(() => { counters.road++; return []; })
+      ])
+    : [[], [], [], []];
 
   const wetlandAcres = wetlandFeatures.length > 0
     ? intersectionAcres(parcelFeature.geometry, wetlandFeatures)

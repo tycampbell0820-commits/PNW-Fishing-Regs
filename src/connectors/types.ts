@@ -3,12 +3,12 @@ import type { RawParcel } from '../lib/types';
 // Counties are added by implementing this interface and registering the connector.
 // Each connector is responsible for: hitting source GIS/assessor APIs, joining
 // parcel / wetland / sewer / road data, and producing RawParcel records.
+//
+// Connectors stream parcels in pages so very large counties can ingest without
+// holding the full dataset in memory at once.
 export interface CountyConnector {
   readonly county: string;
-
-  // Optional minimum acreage filter applied at the source to keep ingests small.
-  // The default app filter is 7 acres, so connectors can pre-filter on the wire.
-  fetch(options?: FetchOptions): Promise<RawParcel[]>;
+  fetchStream(options?: FetchOptions): AsyncIterable<RawParcel[]>;
 }
 
 export interface FetchOptions {

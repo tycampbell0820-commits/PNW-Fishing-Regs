@@ -1,10 +1,11 @@
 // CLI: npm run ingest -- [county] [--limit N] [--min-acres N]
 //
-// Pulls raw parcels from a county connector, normalizes them (derived fields +
-// score), and upserts into the local SQLite store.
+// Pulls raw parcels from a county connector in pages, normalizes each batch
+// (derived fields + score), and upserts into the local SQLite store. Streaming
+// keeps peak memory bounded so very large counties ingest on small VMs.
 //
-// Live ingestion requires LANDFINDER_LIVE=1. Without it, the connector returns
-// its bundled sample data — useful for offline UI work.
+// Live ingestion requires LANDFINDER_LIVE=1. Without it, the connector yields
+// its bundled sample data in a single batch.
 
 import { getConnector, listCounties } from '../connectors/registry';
 import { normalizeParcel } from '../lib/calculations';
@@ -56,17 +57,27 @@ async function main() {
   const connector = getConnector(args.county);
   console.log(`Ingesting ${args.county}${args.limit ? ` (limit ${args.limit})` : ''}…`);
 
-  const raw = await connector.fetch({
+  let totalUpserted = 0;
+  let minScore = Infinity;
+  let maxScore = -Infinity;
+
+  for await (const batch of connector.fetchStream({
     minGrossAcres: args.minGrossAcres ?? 3,
     maxRecords: args.limit
-  });
+  })) {
+    const normalized = batch.map(normalizeParcel);
+    totalUpserted += upsertParcels(normalized);
+    for (const p of normalized) {
+      const s = p.finished_lot_potential_score ?? 0;
+      if (s < minScore) minScore = s;
+      if (s > maxScore) maxScore = s;
+    }
+    console.log(`  batch upserted ${normalized.length} (running total ${totalUpserted})`);
+  }
 
-  console.log(`  fetched ${raw.length} raw parcels`);
-  const normalized = raw.map(normalizeParcel);
-  const n = upsertParcels(normalized);
-  console.log(`  upserted ${n} parcels`);
+  console.log(`  upserted ${totalUpserted} parcels`);
 
-  if (n === 0) {
+  if (totalUpserted === 0) {
     console.error(
       'Ingest produced 0 parcels — treating as failure so the caller can ' +
       'restore the previous DB. Check the connector output above for the ' +
@@ -75,11 +86,8 @@ async function main() {
     process.exit(2);
   }
 
-  const scores = normalized
-    .map(p => p.finished_lot_potential_score ?? 0)
-    .sort((a, b) => a - b);
-  if (scores.length > 0) {
-    console.log(`  score range: ${scores[0]}–${scores[scores.length - 1]}`);
+  if (Number.isFinite(minScore) && Number.isFinite(maxScore)) {
+    console.log(`  score range: ${minScore}–${maxScore}`);
   }
 }
 
