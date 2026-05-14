@@ -22,7 +22,7 @@ export type BottomfishRegs = {
   cabezon: { open: boolean; startMD?: [number, number]; endMD?: [number, number]; minIn?: number; limit?: number; note?: string };
   rockfish: { open: boolean; note?: string };
   surfperch: { open: boolean; limit?: number; shinerLimit?: number; note?: string };
-  pacificCod: { open: boolean };
+  pacificCod: { open: boolean; note?: string };
   totalDailyLimit: number;
   maxDepthFt?: number;
 };
