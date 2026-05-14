@@ -101,21 +101,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   border: none;
   background: none;
   color: var(--text-mute);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
-  padding: 6px 4px;
+  padding: 5px 2px;
   border-top: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
+  min-width: 0;
 }
-.fish-nav-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+.fish-nav-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 .fish-nav-btn.active { color: var(--fish-teal); border-top-color: var(--fish-teal); }
 
 /* ── Cards ─────────────────────────────────────────────────────────────── */

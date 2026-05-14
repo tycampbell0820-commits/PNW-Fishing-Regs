@@ -22,13 +22,18 @@ If image is too blurry/dark to identify, set confidence to "Low" and explain in 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { image, mimeType = 'image/jpeg' } = body as { image: string; mimeType?: string };
+    const { image, mimeType = 'image/jpeg', clientApiKey } = body as {
+      image: string;
+      mimeType?: string;
+      clientApiKey?: string;
+    };
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    // Client-provided key (from app Settings tab) takes precedence over env var.
+    const apiKey = clientApiKey?.trim() || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'ANTHROPIC_API_KEY not configured on server. Add it to your .env.local file.' },
-        { status: 500 }
+        { error: 'No API key. Open the Settings tab in the app and add your Anthropic API key.' },
+        { status: 401 }
       );
     }
 

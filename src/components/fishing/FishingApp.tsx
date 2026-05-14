@@ -91,7 +91,9 @@ function IconLog() {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'id' | 'regs' | 'tips' | 'where' | 'log';
+type Tab = 'id' | 'regs' | 'tips' | 'where' | 'log' | 'settings';
+
+const API_KEY_STORAGE = 'fish-guide-api-key';
 
 type FishIdResult = {
   species: string;
@@ -196,44 +198,75 @@ function useCatchLog() {
 
 export default function FishingApp() {
   const [tab, setTab] = useState<Tab>('regs');
-  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState('');
   const { entries, addEntry, removeEntry } = useCatchLog();
+
+  useEffect(() => {
+    const saved = localStorage.getItem(API_KEY_STORAGE);
+    if (saved) setApiKey(saved);
+  }, []);
+
+  const saveApiKey = useCallback((key: string) => {
+    const trimmed = key.trim();
+    setApiKey(trimmed);
+    if (trimmed) localStorage.setItem(API_KEY_STORAGE, trimmed);
+    else localStorage.removeItem(API_KEY_STORAGE);
+  }, []);
 
   return (
     <div className="fishing-app">
       <header className="fish-header">
         <span className="fish-logo">🎣 PNW Fish Guide</span>
         <div className="fish-header-actions">
-          <button className="fish-icon-btn" onClick={() => setShowSettings(true)} aria-label="Settings">
-            <IconSettings />
-          </button>
+          {!apiKey && (
+            <button
+              className="fish-icon-btn"
+              onClick={() => setTab('settings')}
+              aria-label="Settings"
+              title="Add API key"
+              style={{color:'var(--fish-warn)'}}
+            >
+              <IconSettings />
+            </button>
+          )}
+          {apiKey && (
+            <button
+              className="fish-icon-btn"
+              onClick={() => setTab('settings')}
+              aria-label="Settings"
+            >
+              <IconSettings />
+            </button>
+          )}
         </div>
       </header>
 
       <main className="fish-main">
-        {tab === 'id'    && <FishIdTab onSaveCatch={addEntry} />}
-        {tab === 'regs'  && <RegsTab />}
-        {tab === 'tips'  && <TipsTab />}
-        {tab === 'where' && <WhereTab />}
-        {tab === 'log'   && <CatchLogTab entries={entries} onRemove={removeEntry} onAdd={addEntry} />}
+        {tab === 'id'       && <FishIdTab onSaveCatch={addEntry} apiKey={apiKey} />}
+        {tab === 'regs'     && <RegsTab />}
+        {tab === 'tips'     && <TipsTab />}
+        {tab === 'where'    && <WhereTab />}
+        {tab === 'log'      && <CatchLogTab entries={entries} onRemove={removeEntry} onAdd={addEntry} />}
+        {tab === 'settings' && <SettingsTab apiKey={apiKey} onSaveKey={saveApiKey} />}
       </main>
 
       <nav className="fish-nav">
-        <NavBtn icon={<IconFish />}      label="ID"    active={tab === 'id'}    onClick={() => setTab('id')} />
-        <NavBtn icon={<IconClipboard />} label="Regs"  active={tab === 'regs'}  onClick={() => setTab('regs')} />
-        <NavBtn icon={<IconHook />}      label="How To" active={tab === 'tips'} onClick={() => setTab('tips')} />
-        <NavBtn icon={<IconMapPin />}    label="Where" active={tab === 'where'} onClick={() => setTab('where')} />
-        <NavBtn icon={<IconLog />}       label="Log"   active={tab === 'log'}   onClick={() => setTab('log')}
+        <NavBtn icon={<IconFish />}      label="ID"      active={tab === 'id'}       onClick={() => setTab('id')} />
+        <NavBtn icon={<IconClipboard />} label="Regs"    active={tab === 'regs'}     onClick={() => setTab('regs')} />
+        <NavBtn icon={<IconHook />}      label="How To"  active={tab === 'tips'}     onClick={() => setTab('tips')} />
+        <NavBtn icon={<IconMapPin />}    label="Where"   active={tab === 'where'}    onClick={() => setTab('where')} />
+        <NavBtn icon={<IconLog />}       label="Log"     active={tab === 'log'}      onClick={() => setTab('log')}
           badge={entries.length > 0 ? entries.length : undefined} />
+        <NavBtn icon={<IconSettings />}  label="Settings" active={tab === 'settings'} onClick={() => setTab('settings')}
+          alert={!apiKey} />
       </nav>
-
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
 
-function NavBtn({ icon, label, active, onClick, badge }: {
-  icon: React.ReactNode; label: string; active: boolean; onClick: () => void; badge?: number;
+function NavBtn({ icon, label, active, onClick, badge, alert }: {
+  icon: React.ReactNode; label: string; active: boolean; onClick: () => void;
+  badge?: number; alert?: boolean;
 }) {
   return (
     <button className={`fish-nav-btn${active ? ' active' : ''}`} onClick={onClick}>
@@ -250,51 +283,25 @@ function NavBtn({ icon, label, active, onClick, badge }: {
             {badge > 99 ? '99' : badge}
           </span>
         )}
+        {alert && badge === undefined && (
+          <span style={{
+            position:'absolute',top:-4,right:-5,
+            background:'var(--fish-warn)',
+            borderRadius:'50%',width:7,height:7,
+          }} />
+        )}
       </span>
       {label}
     </button>
   );
 }
 
-// ── Settings Panel ────────────────────────────────────────────────────────────
-
-function SettingsPanel({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="settings-overlay" onClick={onClose}>
-      <div className="settings-sheet" onClick={e => e.stopPropagation()}>
-        <div className="settings-handle" />
-        <h2 className="settings-title">Settings</h2>
-
-        <p className="settings-section-title">Fish Identification API</p>
-        <p className="settings-input-label">
-          Fish ID uses Claude AI (claude-haiku-4-5) to identify species from photos.
-          Add your Anthropic API key to <code>.env.local</code>:
-        </p>
-        <div style={{background:'var(--bg)',borderRadius:10,padding:'12px 14px',fontFamily:'monospace',fontSize:13,color:'var(--fish-teal)',border:'1px solid var(--border-2)'}}>
-          ANTHROPIC_API_KEY=sk-ant-...
-        </div>
-        <p className="settings-help">
-          Get an API key at console.anthropic.com. Claude Haiku is inexpensive (~$0.001/photo).
-          The key stays on your server — it is never sent to the browser.
-        </p>
-
-        <p className="settings-section-title">Data & Regulations</p>
-        <p className="settings-input-label" style={{color:'var(--text-mute)',fontSize:12,lineHeight:1.6}}>
-          Regulations reflect WDFW 2025–2026 season (July 1 2025 – June 30 2026).
-          Always verify at <strong style={{color:'var(--fish-teal)'}}>wdfw.wa.gov</strong> or call (360) 902-2700 for emergency rule changes.
-        </p>
-
-        <div className="settings-actions">
-          <button className="btn btn-primary" onClick={onClose}>Done</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Fish ID Tab ───────────────────────────────────────────────────────────────
 
-function FishIdTab({ onSaveCatch }: { onSaveCatch: (entry: Omit<CatchEntry, 'id' | 'timestamp'>) => CatchEntry }) {
+function FishIdTab({ onSaveCatch, apiKey }: {
+  onSaveCatch: (entry: Omit<CatchEntry, 'id' | 'timestamp'>) => CatchEntry;
+  apiKey: string;
+}) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState('image/jpeg');
   const [result, setResult] = useState<FishIdResult | null>(null);
@@ -325,7 +332,7 @@ function FishIdTab({ onSaveCatch }: { onSaveCatch: (entry: Omit<CatchEntry, 'id'
       const res = await fetch('/api/fishing/identify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType }),
+        body: JSON.stringify({ image: base64, mimeType, clientApiKey: apiKey || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unknown error');
@@ -445,6 +452,13 @@ function FishIdTab({ onSaveCatch }: { onSaveCatch: (entry: Omit<CatchEntry, 'id'
           }}
           onClose={() => setShowSaveSheet(false)}
         />
+      )}
+
+      {!apiKey && (
+        <div className="api-key-notice">
+          <strong>API key required for fish ID.</strong>
+          {' '}Tap the <strong>Settings</strong> tab to add your free Claude API key.
+        </div>
       )}
 
       <p className="disclaimer">
@@ -1522,6 +1536,203 @@ function CatchEntryCard({ entry, expanded, onToggle, onDelete }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Settings Tab ──────────────────────────────────────────────────────────────
+
+function SettingsTab({ apiKey, onSaveKey }: {
+  apiKey: string;
+  onSaveKey: (key: string) => void;
+}) {
+  const [draft, setDraft] = useState(apiKey);
+  const [showKey, setShowKey] = useState(false);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [testMsg, setTestMsg] = useState('');
+
+  const isDirty = draft.trim() !== apiKey;
+  const hasKey = !!apiKey;
+
+  const handleSave = () => {
+    onSaveKey(draft);
+    setTestStatus('idle');
+  };
+
+  const handleClear = () => {
+    setDraft('');
+    onSaveKey('');
+    setTestStatus('idle');
+  };
+
+  const testConnection = async () => {
+    const key = draft.trim() || apiKey;
+    if (!key) return;
+    setTestStatus('testing');
+    setTestMsg('');
+    try {
+      // Tiny 1×1 white JPEG — just enough to test auth without spending tokens on a real image
+      const tiny1x1 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVIP/2Q==';
+      const res = await fetch('/api/fishing/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: tiny1x1, mimeType: 'image/jpeg', clientApiKey: key }),
+      });
+      const data = await res.json();
+      if (res.status === 401 || (data?.error ?? '').toLowerCase().includes('api key')) {
+        setTestStatus('fail');
+        setTestMsg('Invalid API key — double-check it and try again.');
+      } else {
+        setTestStatus('ok');
+        setTestMsg('Connected!');
+      }
+    } catch (e) {
+      setTestStatus('fail');
+      setTestMsg(String(e));
+    }
+  };
+
+  return (
+    <div className="tab-content">
+      <div className="section-header">
+        <span className="section-title">Settings</span>
+      </div>
+
+      {/* ── API Key ── */}
+      <div className="fish-card" style={{margin:'6px 12px'}}>
+        <p className="fish-card-title">🔑 Claude API Key</p>
+        <p style={{fontSize:12,color:'var(--text-mute)',marginBottom:12,lineHeight:1.6}}>
+          Required for AI fish ID. Each person uses their own key — sign up free at{' '}
+          <strong style={{color:'var(--fish-teal)'}}>console.anthropic.com</strong>.
+          Cost is about <strong style={{color:'var(--text)'}}>$0.001 per photo</strong>.
+        </p>
+
+        <div style={{position:'relative',marginBottom:8}}>
+          <input
+            className="settings-input"
+            type={showKey ? 'text' : 'password'}
+            value={draft}
+            onChange={e => { setDraft(e.target.value); setTestStatus('idle'); }}
+            placeholder="sk-ant-api03-..."
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            style={{paddingRight:48,fontFamily:'monospace',fontSize:13}}
+          />
+          <button
+            onClick={() => setShowKey(v => !v)}
+            style={{
+              position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',
+              background:'none',border:'none',cursor:'pointer',
+              fontSize:16,padding:'4px',lineHeight:1,color:'var(--text-mute)',
+            }}
+            aria-label={showKey ? 'Hide key' : 'Show key'}
+          >
+            {showKey ? '🙈' : '👁'}
+          </button>
+        </div>
+
+        {/* Status */}
+        <div style={{minHeight:26,marginBottom:12}}>
+          {!draft && !hasKey && (
+            <span className="badge badge-closed">No key — fish ID disabled</span>
+          )}
+          {hasKey && !isDirty && testStatus === 'idle' && (
+            <span className="badge badge-open">✓ Key saved</span>
+          )}
+          {isDirty && draft && testStatus === 'idle' && (
+            <span className="badge badge-warn">Unsaved changes</span>
+          )}
+          {testStatus === 'testing' && <span className="badge badge-info">Testing…</span>}
+          {testStatus === 'ok'      && <span className="badge badge-open">✓ {testMsg}</span>}
+          {testStatus === 'fail'    && <span className="badge badge-closed">✗ {testMsg}</span>}
+        </div>
+
+        <div style={{display:'flex',gap:8}}>
+          <button
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={!isDirty || !draft.trim()}
+            style={{flex:2}}
+          >
+            Save Key
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={testConnection}
+            disabled={(!draft.trim() && !hasKey) || testStatus === 'testing'}
+            style={{flex:1,fontSize:13}}
+          >
+            Test
+          </button>
+          {hasKey && (
+            <button
+              className="btn btn-secondary"
+              onClick={handleClear}
+              style={{flex:1,fontSize:13,color:'var(--fish-closed)'}}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <p style={{fontSize:11,color:'var(--text-mute)',marginTop:10,lineHeight:1.5}}>
+          Stored on <strong>this device only</strong>. Never shared. Sent directly to Anthropic when you use fish ID.
+        </p>
+      </div>
+
+      {/* ── Regulations info ── */}
+      <div className="fish-card" style={{margin:'6px 12px'}}>
+        <p className="fish-card-title">📋 Regulations Data</p>
+        <div className="reg-row">
+          <span className="reg-row-label">Season</span>
+          <span className="reg-row-value">2025 – 2026</span>
+        </div>
+        <div className="reg-row">
+          <span className="reg-row-label">Coverage</span>
+          <span className="reg-row-value">Marine Areas 5–13, WA rivers &amp; lakes</span>
+        </div>
+        <div className="reg-row" style={{borderBottom:'none'}}>
+          <span className="reg-row-label">Source</span>
+          <span className="reg-row-value">WDFW pamphlet 2025–2026</span>
+        </div>
+        <div style={{marginTop:10,padding:'10px 12px',background:'var(--fish-warn-bg)',borderRadius:8,fontSize:12,color:'var(--fish-warn)',lineHeight:1.5}}>
+          ⚠ Always verify at <strong>wdfw.wa.gov</strong> or call (360) 902-2700.
+          Emergency rules can change any time.
+        </div>
+      </div>
+
+      {/* ── Quick links ── */}
+      <div className="fish-card" style={{margin:'6px 12px'}}>
+        <p className="fish-card-title">🔗 Quick Links</p>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {([
+            ['WDFW Emergency Rules',      'https://fortress.wa.gov/dfw/erules/efishrules/'],
+            ['WDFW License &amp; CRC',    'https://fishhunt.dfw.wa.gov/'],
+            ['Get a Claude API Key',      'https://console.anthropic.com/settings/keys'],
+            ['USGS Stream Flow (WA)',     'https://waterdata.usgs.gov/wa/nwis/rt'],
+          ] as [string, string][]).map(([label, url]) => (
+            <a
+              key={url}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display:'flex',alignItems:'center',justifyContent:'space-between',
+                padding:'11px 13px',
+                background:'var(--panel-2)',border:'1px solid var(--border)',borderRadius:9,
+                fontSize:13,color:'var(--fish-teal)',textDecoration:'none',fontWeight:500,
+              }}
+              dangerouslySetInnerHTML={undefined}
+            >
+              <span dangerouslySetInnerHTML={{__html: label}} />
+              <span style={{color:'var(--text-mute)',fontSize:12}}>↗</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <p className="disclaimer">PNW Fish Guide · WA 2025–2026 · All data stored locally on device</p>
     </div>
   );
 }
