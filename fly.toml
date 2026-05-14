@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for offmarketsource on 2026-05-12T21:29:47Z
+# fly.toml app configuration file generated for pnw-fishing-regs on 2026-05-14T20:46:56Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'offmarketsource'
+app = 'pnw-fishing-regs'
 primary_region = 'sjc'
 
 [build]
