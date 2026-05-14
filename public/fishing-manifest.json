@@ -1,0 +1,21 @@
+{
+  "name": "PNW Fish Guide",
+  "short_name": "Fish Guide",
+  "description": "Pacific Northwest fishing regulations, species identification, and fishing tips",
+  "start_url": "/fishing",
+  "scope": "/fishing",
+  "display": "standalone",
+  "background_color": "#0f1419",
+  "theme_color": "#1a9e7c",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a9e7c'/><text y='.9em' font-size='75' x='12'>🎣</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["sports", "lifestyle"],
+  "lang": "en-US"
+}
