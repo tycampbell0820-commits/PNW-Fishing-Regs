@@ -77,10 +77,21 @@ function IconChevron() {
     </svg>
   );
 }
+function IconLog() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <line x1="10" y1="9" x2="8" y2="9"/>
+    </svg>
+  );
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'id' | 'regs' | 'tips' | 'where';
+type Tab = 'id' | 'regs' | 'tips' | 'where' | 'log';
 
 type FishIdResult = {
   species: string;
@@ -94,17 +105,99 @@ type FishIdResult = {
   error?: string;
 };
 
+// ── Catch Log Types & Helpers ────────────────────────────────────────────────
+
+type CatchEntry = {
+  id: string;
+  timestamp: number;
+  species: string;
+  scientificName?: string;
+  date: string;            // YYYY-MM-DD
+  location: string;
+  sizeIn?: string;
+  weightLb?: string;
+  thumbnailData?: string;  // compressed base64 for localStorage
+  notes: string;
+  confidence?: string;
+  aiFeatures?: string[];
+};
+
+type SaveFormData = {
+  species: string;
+  date: string;
+  location: string;
+  sizeIn: string;
+  weightLb: string;
+  notes: string;
+};
+
+const CATCH_LOG_KEY = 'pnw-fish-catches';
+
+function loadCatches(): CatchEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CATCH_LOG_KEY);
+    return raw ? (JSON.parse(raw) as CatchEntry[]) : [];
+  } catch { return []; }
+}
+
+function persistCatches(entries: CatchEntry[]) {
+  try { localStorage.setItem(CATCH_LOG_KEY, JSON.stringify(entries)); } catch {}
+}
+
+function makeId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+async function compressImage(dataUrl: string, maxPx = 400): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+      const w = Math.round(img.width * ratio);
+      const h = Math.round(img.height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.65));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function useCatchLog() {
+  const [entries, setEntries] = useState<CatchEntry[]>([]);
+
+  useEffect(() => { setEntries(loadCatches()); }, []);
+
+  const addEntry = useCallback((entry: Omit<CatchEntry, 'id' | 'timestamp'>): CatchEntry => {
+    const newEntry: CatchEntry = { ...entry, id: makeId(), timestamp: Date.now() };
+    setEntries(prev => {
+      const next = [newEntry, ...prev];
+      persistCatches(next);
+      return next;
+    });
+    return newEntry;
+  }, []);
+
+  const removeEntry = useCallback((id: string) => {
+    setEntries(prev => {
+      const next = prev.filter(e => e.id !== id);
+      persistCatches(next);
+      return next;
+    });
+  }, []);
+
+  return { entries, addEntry, removeEntry };
+}
+
 // ── Root App ──────────────────────────────────────────────────────────────────
 
 export default function FishingApp() {
   const [tab, setTab] = useState<Tab>('regs');
   const [showSettings, setShowSettings] = useState(false);
-  const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-
-  useEffect(() => {
-    // Check if .env.local has the key (we detect by probing on first load)
-    setApiKeyConfigured(true); // The route itself will fail gracefully if not configured
-  }, []);
+  const { entries, addEntry, removeEntry } = useCatchLog();
 
   return (
     <div className="fishing-app">
@@ -118,17 +211,20 @@ export default function FishingApp() {
       </header>
 
       <main className="fish-main">
-        {tab === 'id'    && <FishIdTab />}
+        {tab === 'id'    && <FishIdTab onSaveCatch={addEntry} />}
         {tab === 'regs'  && <RegsTab />}
         {tab === 'tips'  && <TipsTab />}
         {tab === 'where' && <WhereTab />}
+        {tab === 'log'   && <CatchLogTab entries={entries} onRemove={removeEntry} onAdd={addEntry} />}
       </main>
 
       <nav className="fish-nav">
-        <NavBtn icon={<IconFish />}      label="ID"      active={tab === 'id'}    onClick={() => setTab('id')} />
-        <NavBtn icon={<IconClipboard />} label="Regs"    active={tab === 'regs'}  onClick={() => setTab('regs')} />
-        <NavBtn icon={<IconHook />}      label="How To"  active={tab === 'tips'}  onClick={() => setTab('tips')} />
-        <NavBtn icon={<IconMapPin />}    label="Where"   active={tab === 'where'} onClick={() => setTab('where')} />
+        <NavBtn icon={<IconFish />}      label="ID"    active={tab === 'id'}    onClick={() => setTab('id')} />
+        <NavBtn icon={<IconClipboard />} label="Regs"  active={tab === 'regs'}  onClick={() => setTab('regs')} />
+        <NavBtn icon={<IconHook />}      label="How To" active={tab === 'tips'} onClick={() => setTab('tips')} />
+        <NavBtn icon={<IconMapPin />}    label="Where" active={tab === 'where'} onClick={() => setTab('where')} />
+        <NavBtn icon={<IconLog />}       label="Log"   active={tab === 'log'}   onClick={() => setTab('log')}
+          badge={entries.length > 0 ? entries.length : undefined} />
       </nav>
 
       {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
@@ -136,10 +232,25 @@ export default function FishingApp() {
   );
 }
 
-function NavBtn({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
+function NavBtn({ icon, label, active, onClick, badge }: {
+  icon: React.ReactNode; label: string; active: boolean; onClick: () => void; badge?: number;
+}) {
   return (
     <button className={`fish-nav-btn${active ? ' active' : ''}`} onClick={onClick}>
-      {icon}
+      <span style={{position:'relative',display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+        {icon}
+        {badge !== undefined && badge > 0 && (
+          <span style={{
+            position:'absolute',top:-5,right:-7,
+            background:'var(--fish-teal)',color:'#fff',
+            borderRadius:'50%',width:15,height:15,
+            fontSize:9,fontWeight:800,
+            display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,
+          }}>
+            {badge > 99 ? '99' : badge}
+          </span>
+        )}
+      </span>
       {label}
     </button>
   );
@@ -183,18 +294,22 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
 
 // ── Fish ID Tab ───────────────────────────────────────────────────────────────
 
-function FishIdTab() {
+function FishIdTab({ onSaveCatch }: { onSaveCatch: (entry: Omit<CatchEntry, 'id' | 'timestamp'>) => CatchEntry }) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [mimeType, setMimeType] = useState('image/jpeg');
   const [result, setResult] = useState<FishIdResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSaveSheet, setShowSaveSheet] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((file: File) => {
     setResult(null);
     setError(null);
+    setSavedId(null);
+    setShowSaveSheet(false);
     setMimeType(file.type || 'image/jpeg');
     const reader = new FileReader();
     reader.onloadend = () => setPhoto(reader.result as string);
@@ -287,7 +402,50 @@ function FishIdTab() {
         </div>
       )}
 
-      {result && !loading && <FishIdResult result={result} />}
+      {result && !loading && (
+        <>
+          <FishIdResult result={result} />
+          {!result.notFish && (
+            savedId ? (
+              <div style={{margin:'0 12px 8px',padding:'11px 14px',background:'var(--fish-open-bg)',border:'1px solid var(--fish-open)',borderRadius:10,fontSize:13,color:'var(--fish-open)',textAlign:'center',fontWeight:600}}>
+                ✓ Saved to catch log
+              </div>
+            ) : (
+              <div style={{margin:'0 12px 8px'}}>
+                <button className="btn btn-outline" onClick={() => setShowSaveSheet(true)}>
+                  💾 Save to Catch Log
+                </button>
+              </div>
+            )
+          )}
+        </>
+      )}
+
+      {showSaveSheet && result && (
+        <SaveCatchSheet
+          defaultSpecies={result.species}
+          defaultScientific={result.scientificName}
+          confidence={result.confidence}
+          onSave={async (formData) => {
+            const thumbnail = photo ? await compressImage(photo) : undefined;
+            const entry = onSaveCatch({
+              species: formData.species,
+              scientificName: result.scientificName,
+              date: formData.date,
+              location: formData.location,
+              sizeIn: formData.sizeIn || undefined,
+              weightLb: formData.weightLb || undefined,
+              thumbnailData: thumbnail,
+              notes: formData.notes,
+              confidence: result.confidence,
+              aiFeatures: result.features,
+            });
+            setSavedId(entry.id);
+            setShowSaveSheet(false);
+          }}
+          onClose={() => setShowSaveSheet(false)}
+        />
+      )}
 
       <p className="disclaimer">
         AI identification may not be 100% accurate. Always verify species before keeping.
@@ -1028,4 +1186,342 @@ function getRiverPicks(month: number): RiverPick[] {
     12: [{ river: 'Cowlitz River', target: 'Winter Steelhead', hot: true, tip: 'Dec brings strong steelhead runs to the Cowlitz. Hatchery fish below Barrier Dam are chrome bright.' }, { river: 'Snohomish / Skykomish', target: 'Winter Steelhead', hot: false, tip: 'Early steelhead showing — fish during rising water conditions for best results.' }],
   };
   return picks[month] ?? picks[1];
+}
+
+// ── Save Catch Sheet ──────────────────────────────────────────────────────────
+
+function SaveCatchSheet({ defaultSpecies, defaultScientific, confidence, onSave, onClose, allowPhoto = false }: {
+  defaultSpecies?: string;
+  defaultScientific?: string;
+  confidence?: string;
+  onSave: (data: SaveFormData & { photoData?: string }) => Promise<void>;
+  onClose: () => void;
+  allowPhoto?: boolean;
+}) {
+  const today = new Date().toISOString().split('T')[0];
+  const [species, setSpecies] = useState(defaultSpecies ?? '');
+  const [date, setDate] = useState(today);
+  const [location, setLocation] = useState('');
+  const [sizeIn, setSizeIn] = useState('');
+  const [weightLb, setWeightLb] = useState('');
+  const [notes, setNotes] = useState('');
+  const [photoData, setPhotoData] = useState<string | undefined>();
+  const [saving, setSaving] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoFile = useCallback(async (file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const compressed = await compressImage(reader.result as string);
+      setPhotoData(compressed);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleSave = async () => {
+    if (!species.trim()) return;
+    setSaving(true);
+    try {
+      await onSave({ species, date, location, sizeIn, weightLb, notes, photoData });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confColor = confidence === 'High' ? 'open' : confidence === 'Medium' ? 'warn' : confidence === 'Low' ? 'closed' : undefined;
+
+  return (
+    <div className="settings-overlay" onClick={onClose}>
+      <div className="settings-sheet" onClick={e => e.stopPropagation()}>
+        <div className="settings-handle" />
+        <h2 className="settings-title">Save to Catch Log</h2>
+
+        {defaultSpecies && (
+          <div style={{background:'var(--fish-teal-soft)',border:'1px solid var(--fish-teal)',borderRadius:10,padding:'10px 14px',marginBottom:14}}>
+            <div style={{fontWeight:700,color:'var(--fish-teal)'}}>{defaultSpecies}</div>
+            {defaultScientific && <div style={{fontSize:12,fontStyle:'italic',color:'var(--text-mute)',marginTop:2}}>{defaultScientific}</div>}
+            {confColor && <span className={`badge badge-${confColor}`} style={{marginTop:6,display:'inline-flex'}}>{confidence} confidence</span>}
+          </div>
+        )}
+
+        <label className="settings-input-label">Species *</label>
+        <input className="settings-input" value={species} onChange={e => setSpecies(e.target.value)} placeholder="e.g. Chinook Salmon" />
+
+        <label className="settings-input-label" style={{marginTop:10,display:'block'}}>Date *</label>
+        <input className="settings-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
+
+        <label className="settings-input-label" style={{marginTop:10,display:'block'}}>Location</label>
+        <input className="settings-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Marine Area 10, Elliott Bay" />
+
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          <div style={{flex:1}}>
+            <label className="settings-input-label" style={{display:'block'}}>Size (in)</label>
+            <input className="settings-input" value={sizeIn} onChange={e => setSizeIn(e.target.value)} placeholder='28"' inputMode="decimal" />
+          </div>
+          <div style={{flex:1}}>
+            <label className="settings-input-label" style={{display:'block'}}>Weight (lbs)</label>
+            <input className="settings-input" value={weightLb} onChange={e => setWeightLb(e.target.value)} placeholder="12.5" inputMode="decimal" />
+          </div>
+        </div>
+
+        <label className="settings-input-label" style={{marginTop:10,display:'block'}}>Notes</label>
+        <textarea
+          className="settings-input"
+          value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Where exactly, what lure/bait worked, conditions…"
+          rows={3}
+          style={{resize:'none',fontFamily:'inherit'}}
+        />
+
+        {allowPhoto && (
+          <>
+            <label className="settings-input-label" style={{marginTop:10,display:'block'}}>Photo (optional)</label>
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={e => e.target.files?.[0] && handlePhotoFile(e.target.files[0])} style={{display:'none'}} />
+            {photoData ? (
+              <div style={{position:'relative',marginBottom:4}}>
+                <img src={photoData} alt="Catch" style={{width:'100%',borderRadius:10,display:'block'}} />
+                <button
+                  onClick={() => setPhotoData(undefined)}
+                  style={{position:'absolute',top:6,right:6,background:'rgba(0,0,0,0.5)',color:'#fff',border:'none',borderRadius:6,padding:'4px 8px',fontSize:12,cursor:'pointer'}}
+                >
+                  ✕ Remove
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary" style={{fontSize:13}} onClick={() => photoRef.current?.click()}>
+                <IconCamera /> Add Photo
+              </button>
+            )}
+          </>
+        )}
+
+        <div className="settings-actions" style={{marginTop:16}}>
+          <button className="btn btn-secondary" onClick={onClose} style={{flex:1}}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={!species.trim() || saving} style={{flex:2}}>
+            {saving ? 'Saving…' : '💾 Save Catch'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Catch Log Tab ─────────────────────────────────────────────────────────────
+
+function CatchLogTab({ entries, onRemove, onAdd }: {
+  entries: CatchEntry[];
+  onRemove: (id: string) => void;
+  onAdd: (entry: Omit<CatchEntry, 'id' | 'timestamp'>) => CatchEntry;
+}) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAddSheet, setShowAddSheet] = useState(false);
+
+  const totalCount = entries.length;
+  const speciesCounts = entries.reduce<Record<string, number>>((acc, e) => {
+    acc[e.species] = (acc[e.species] ?? 0) + 1;
+    return acc;
+  }, {});
+  const topSpecies = Object.entries(speciesCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+  return (
+    <div className="tab-content">
+      <div className="section-header">
+        <span className="section-title">Catch Log</span>
+        <button
+          className="btn btn-primary"
+          style={{width:'auto',padding:'8px 16px',fontSize:13}}
+          onClick={() => setShowAddSheet(true)}
+        >
+          + Add
+        </button>
+      </div>
+
+      {totalCount === 0 ? (
+        <div className="empty-state">
+          <span className="empty-icon">📖</span>
+          <p>No catches logged yet.</p>
+          <p style={{marginTop:4,fontSize:12}}>Identify a fish and tap &quot;Save to Catch Log,&quot; or tap + Add above to log manually.</p>
+          <button className="btn btn-outline" style={{marginTop:16,maxWidth:200,margin:'16px auto 0'}} onClick={() => setShowAddSheet(true)}>
+            + Log a Catch
+          </button>
+        </div>
+      ) : (
+        <>
+          {topSpecies.length > 0 && (
+            <div className="fish-card" style={{margin:'6px 12px'}}>
+              <p className="fish-card-title">Summary — {totalCount} {totalCount === 1 ? 'catch' : 'catches'}</p>
+              <div className="pill-row">
+                {topSpecies.map(([sp, count]) => (
+                  <span key={sp} className="pill" style={{background:'var(--fish-teal-soft)',color:'var(--fish-teal)',borderColor:'var(--fish-teal)'}}>
+                    {sp} × {count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {entries.map(entry => (
+            <CatchEntryCard
+              key={entry.id}
+              entry={entry}
+              expanded={expandedId === entry.id}
+              onToggle={() => setExpandedId(prev => prev === entry.id ? null : entry.id)}
+              onDelete={() => {
+                onRemove(entry.id);
+                if (expandedId === entry.id) setExpandedId(null);
+              }}
+            />
+          ))}
+        </>
+      )}
+
+      {showAddSheet && (
+        <SaveCatchSheet
+          allowPhoto
+          onSave={async (formData) => {
+            onAdd({
+              species: formData.species,
+              date: formData.date,
+              location: formData.location,
+              sizeIn: formData.sizeIn || undefined,
+              weightLb: formData.weightLb || undefined,
+              thumbnailData: formData.photoData,
+              notes: formData.notes,
+            });
+            setShowAddSheet(false);
+          }}
+          onClose={() => setShowAddSheet(false)}
+        />
+      )}
+
+      <p className="disclaimer">Stored locally on this device only. Not backed up to the cloud.</p>
+    </div>
+  );
+}
+
+// ── Catch Entry Card ──────────────────────────────────────────────────────────
+
+function CatchEntryCard({ entry, expanded, onToggle, onDelete }: {
+  entry: CatchEntry;
+  expanded: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const dateStr = entry.date
+    ? new Date(entry.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : new Date(entry.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  return (
+    <div className="catch-entry-card">
+      <div className="catch-entry-header" onClick={onToggle}>
+        <div className="catch-entry-thumb">
+          {entry.thumbnailData
+            ? <img src={entry.thumbnailData} alt={entry.species} className="catch-thumb-img" />
+            : <span style={{fontSize:26,lineHeight:1}}>🐟</span>
+          }
+        </div>
+        <div className="catch-entry-info">
+          <p className="catch-entry-species">{entry.species}</p>
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:3}}>
+            <span className="badge badge-info" style={{fontSize:10,padding:'2px 7px'}}>{dateStr}</span>
+            {entry.location && (
+              <span className="badge" style={{fontSize:10,padding:'2px 7px',background:'var(--panel-2)',color:'var(--text-mute)',borderRadius:20}}>
+                {entry.location.length > 22 ? entry.location.slice(0, 20) + '…' : entry.location}
+              </span>
+            )}
+          </div>
+          {(entry.sizeIn || entry.weightLb) && (
+            <div style={{fontSize:11,color:'var(--text-mute)',marginTop:3}}>
+              {entry.sizeIn && <span>{entry.sizeIn}&quot;</span>}
+              {entry.sizeIn && entry.weightLb && <span> · </span>}
+              {entry.weightLb && <span>{entry.weightLb} lbs</span>}
+            </div>
+          )}
+        </div>
+        <span className={`chevron-icon${expanded ? ' open' : ''}`}><IconChevron /></span>
+      </div>
+
+      {expanded && (
+        <div className="catch-entry-body">
+          {entry.thumbnailData && (
+            <img src={entry.thumbnailData} alt={entry.species} className="catch-detail-photo" />
+          )}
+
+          <div className="catch-stats-grid">
+            {entry.sizeIn && (
+              <div className="catch-stat">
+                <span className="catch-stat-label">Size</span>
+                <span className="catch-stat-val">{entry.sizeIn}&quot;</span>
+              </div>
+            )}
+            {entry.weightLb && (
+              <div className="catch-stat">
+                <span className="catch-stat-label">Weight</span>
+                <span className="catch-stat-val">{entry.weightLb} lbs</span>
+              </div>
+            )}
+            {entry.location && (
+              <div className="catch-stat" style={{gridColumn:'1/-1'}}>
+                <span className="catch-stat-label">Location</span>
+                <span className="catch-stat-val">{entry.location}</span>
+              </div>
+            )}
+            {entry.scientificName && (
+              <div className="catch-stat" style={{gridColumn:'1/-1'}}>
+                <span className="catch-stat-label">Species</span>
+                <span className="catch-stat-val" style={{fontStyle:'italic'}}>{entry.scientificName}</span>
+              </div>
+            )}
+            {entry.confidence && (
+              <div className="catch-stat">
+                <span className="catch-stat-label">AI ID</span>
+                <span className={`badge badge-${entry.confidence === 'High' ? 'open' : entry.confidence === 'Medium' ? 'warn' : 'closed'}`} style={{fontSize:10}}>
+                  {entry.confidence}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {entry.notes ? (
+            <div style={{marginTop:10,fontSize:13,color:'var(--text-dim)',background:'var(--panel-2)',padding:'10px 12px',borderRadius:8,lineHeight:1.5}}>
+              {entry.notes}
+            </div>
+          ) : null}
+
+          {entry.aiFeatures && entry.aiFeatures.length > 0 && (
+            <div style={{marginTop:10}}>
+              <p className="fish-id-section-title">AI ID Features</p>
+              <ul className="feature-list">
+                {entry.aiFeatures.slice(0, 3).map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <div style={{display:'flex',gap:8,marginTop:14}}>
+            {confirmDelete ? (
+              <>
+                <button
+                  className="btn"
+                  style={{flex:1,background:'var(--fish-closed-bg)',color:'var(--fish-closed)',border:'1px solid var(--fish-closed)',fontSize:12,padding:'9px'}}
+                  onClick={onDelete}
+                >
+                  Confirm Delete
+                </button>
+                <button className="btn btn-secondary" style={{flex:1,fontSize:12,padding:'9px'}} onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-secondary" style={{fontSize:12,padding:'9px 14px'}} onClick={() => setConfirmDelete(true)}>
+                🗑 Delete Entry
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
