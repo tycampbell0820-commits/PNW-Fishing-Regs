@@ -18,10 +18,10 @@ export type SalmonPeriod = {
 
 export type BottomfishRegs = {
   halibut: { open: boolean; limit?: number; annualLimit?: number; note?: string };
-  lingcod: { open: boolean; startMD?: [number, number]; endMD?: [number, number]; minIn?: number; maxIn?: number; limit?: number };
-  cabezon: { open: boolean; startMD?: [number, number]; endMD?: [number, number]; minIn?: number; limit?: number };
+  lingcod: { open: boolean; startMD?: [number, number]; endMD?: [number, number]; minIn?: number; maxIn?: number; limit?: number; note?: string };
+  cabezon: { open: boolean; startMD?: [number, number]; endMD?: [number, number]; minIn?: number; limit?: number; note?: string };
   rockfish: { open: boolean; note?: string };
-  surfperch: { open: boolean; limit?: number; shinerLimit?: number };
+  surfperch: { open: boolean; limit?: number; shinerLimit?: number; note?: string };
   pacificCod: { open: boolean };
   totalDailyLimit: number;
   maxDepthFt?: number;
