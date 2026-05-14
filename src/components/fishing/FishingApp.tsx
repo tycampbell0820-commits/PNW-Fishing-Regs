@@ -161,7 +161,14 @@ async function compressImage(dataUrl: string, maxPx = 400): Promise<string> {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.65));
+      // Iteratively reduce quality until base64 is under 4MB
+      let quality = 0.82;
+      let result = canvas.toDataURL('image/jpeg', quality);
+      while (result.length > 4 * 1024 * 1024 && quality > 0.3) {
+        quality -= 0.1;
+        result = canvas.toDataURL('image/jpeg', quality);
+      }
+      resolve(result);
     };
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
@@ -317,9 +324,12 @@ function FishIdTab({ onSaveCatch, apiKey }: {
     setError(null);
     setSavedId(null);
     setShowSaveSheet(false);
-    setMimeType(file.type || 'image/jpeg');
+    setMimeType('image/jpeg');
     const reader = new FileReader();
-    reader.onloadend = () => setPhoto(reader.result as string);
+    reader.onloadend = async () => {
+      const compressed = await compressImage(reader.result as string, 1568);
+      setPhoto(compressed);
+    };
     reader.readAsDataURL(file);
   }, []);
 
