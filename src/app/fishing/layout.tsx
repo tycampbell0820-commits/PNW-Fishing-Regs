@@ -9,6 +9,15 @@ export const metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Fish Guide',
   },
+  other: {
+    // iOS Safari: treat as standalone app when added to home screen
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-title': 'Fish Guide',
+    // Prevent phone number detection from mangling size/weight numbers
+    'format-detection': 'telephone=no',
+  },
 };
 
 export const viewport = {
